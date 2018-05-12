@@ -23,7 +23,7 @@ void draw_sad_fish(uint8_t side);
 void draw_happy_fish(uint8_t side);
 void draw_buttons(uint8_t current_need, uint8_t selected);
 void draw_timer(uint8_t timer);
-void message(char[] message);
+void message(char message[]);
 void highlight_button(uint8_t need);
 void outline_button(uint8_t need);
 
@@ -50,7 +50,7 @@ void fish_screen() {
 
 	for(;;) {
 		if (timer = 0) {
-			current_need = random_need();
+			//current_need = random_need();
 		}
 		draw_fish(current_need, current_side);
 		draw_buttons(current_need, selected_button);
@@ -65,7 +65,8 @@ void fish_screen() {
 }
 
 
-void draw_sad_fish() {}
+void draw_sad_fish(uint8_t side) {}
+void draw_happy_fish(uint8_t side) {}
 
 void draw_buttons(uint8_t current_need, uint8_t selected) {
 
@@ -98,7 +99,7 @@ void draw_buttons(uint8_t current_need, uint8_t selected) {
 	outline_button(selected_button);
 }
 
-void message(char[] message) {}
+void message(char message[]) {}
 
 void need(uint8_t need) {
 	if(need = FOOD) {
@@ -116,7 +117,7 @@ void need(uint8_t need) {
 	}
 }
 
-void action(char[] action) {
+void action(uint8_t action) {
 	current_need = HAPPY;
 
 	if (action = FOOD) {
