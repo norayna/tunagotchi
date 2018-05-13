@@ -42,6 +42,7 @@ uint8_t selected_button;
 int main() {
 	init_lcd();
 	set_orientation(West);
+	os_init_ruota();
 	//intro_screen();
 	fish_screen();
 }
@@ -51,7 +52,7 @@ void fish_screen() {
 	timer = 300000;
 	current_side = 0;
 	selected_button = FOOD;
-	draw_buttons(current_need, selected_button);
+	draw_buttons();
 
 	//TODO remove
 	draw_happy_fish(0);
@@ -62,22 +63,27 @@ void fish_screen() {
 			//current_need = random_need();
 		}
 		//draw_timer(timer, current_need);
-		sei();
+		//sei();
 		scan_switches(0);
 
-		if (get_switch_press(_BV(SWS))) {
+		if (get_switch_press(_BV(SWE))) {
 			outline_selected_button(BLACK);
 			selected_button++;
-			//selected_button = selected_button % 4;
+			if(selected_button == 5) { selected_button = 1; }
 			outline_selected_button(YELLOW);
 		}
 
-		if (get_switch_press(_BV(SWN))) {
+		if (get_switch_press(_BV(SWW))) {
 			outline_selected_button(BLACK);
 			selected_button--;
 			if(selected_button == 0) { selected_button = 4; }
 			outline_selected_button(YELLOW);
 		}
+
+		if(get_switch_press(_BV(SWC))) {
+			action(selected_button);
+		}
+
 
 		//sleep(1000); //java
 
@@ -142,7 +148,7 @@ void draw_buttons() {
 	display_string_xy("ME!!", (rect.left + 15), (rect.top + 23));
 
 	highlight_current_need();
-	outline_selected_button();
+	outline_selected_button(YELLOW);
 }
 
 void highlight_current_need() {
@@ -194,8 +200,8 @@ void outline_selected_button(uint16_t color) {
 		left = LCDHEIGHT/2 + 2;
 		right = LCDHEIGHT/2 + 58;
 	} else if(selected_button == WASH) {
-		left = LCDHEIGHT/2 - 62;
-		right = LCDHEIGHT/2 + 118;
+		left = LCDHEIGHT/2 + 62;
+		right = LCDHEIGHT/2 + 108;
 	}
 
 	rectangle rect;
@@ -258,21 +264,28 @@ void need(uint8_t need) {
 }
 
 void action(uint8_t action) {
-	current_need = HAPPY;
+	if(action == current_need) {
+		current_need = HAPPY;
 
-	if (action == FOOD) {
-		message("i feel fuller than a pufferfish");
-		timer += 3;
-	} else if (action == HUG) {
-		message("i love cuddles more than bubbles!");
-		timer += 3;
-	} else if (action == WALK) {
-		message("woof!");
-		timer += 2;
-	} else if (action == WASH) {
-		message("shine bright like a diamond!");
-		timer += 2;
+		if (action == FOOD) {
+			message("mmm chicken!");
+			timer += 3;
+		} else if (action == HUG) {
+			message("*cuddles* *bubbles*");
+			timer += 3;
+		} else if (action == WALK) {
+			message("woof!");
+			timer += 2;
+		} else if (action == WASH) {
+			message("i feel fresh!");
+			timer += 2;
+		}
+	} else if(current_need == HAPPY) {
+			message("uhmm.. no thanks");
+	} else {
+			message("i'm dying here!!");
 	}
+	draw_buttons();
 }
 
 void draw_happy_fish(uint8_t side) {
