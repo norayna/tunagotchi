@@ -57,10 +57,16 @@ void fish_screen() {
 	//TODO remove
 	draw_happy_fish(0);
 
+	// copied from https://exploreembedded.com/wiki/AVR_Timer_programming
+	TCNT0=0x00;
+	TCCR0 = (1<<CS00) | (1<<CS02);
+
 
 	for(;;) {
 		if(timer == 0) {
 			//current_need = random_need();
+			current_need++;
+			if (current_need == 5) { current_need = 1;}
 		}
 		//draw_timer(timer, current_need);
 		//sei();
@@ -187,8 +193,8 @@ void highlight_current_need() {
 }
 
 void outline_selected_button(uint16_t color) {
-	uint8_t left;
-	uint8_t right;
+	uint16_t left;
+	uint16_t right;
 
 	if(selected_button == FOOD) {
 		left = LCDHEIGHT/2 - 118;
@@ -201,7 +207,7 @@ void outline_selected_button(uint16_t color) {
 		right = LCDHEIGHT/2 + 58;
 	} else if(selected_button == WASH) {
 		left = LCDHEIGHT/2 + 62;
-		right = LCDHEIGHT/2 + 108;
+		right = LCDHEIGHT/2 + 118;
 	}
 
 	rectangle rect;
