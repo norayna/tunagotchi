@@ -4,8 +4,8 @@
 #include <avr/eeprom.h>
 #include <avr/io.h>
 
-#include "lcd.c"
-#include "ruota.c"
+#include "lcd.h"
+#include "ruota.h"
 
 #define FOOD  1
 #define HUG 2
@@ -46,8 +46,6 @@ uint8_t selected_button;
 uint32_t counter_seed;
 uint8_t dead;
 
-//uint16_t EEMEM seed_pointer;
-
 
 
 int main() {
@@ -57,7 +55,6 @@ int main() {
 	set_orientation(West);
 	os_init_ruota();
 	intro_screen();
-	//fish_screen();
 }
 
 void intro_screen() {
@@ -68,7 +65,6 @@ void intro_screen() {
 	display_string("Tuna still loves you with its tiny fish heart, but has deep insecurities.\n");
 	display_string("\n");
 	display_string("Press OK if you love Tuna back.\n");
-	//draw_happy_fish(FRONT);
 
 	while(1) {
 		counter_seed++;
@@ -114,10 +110,9 @@ void fish_screen() {
 				current_need = (rand() % 4) + 1;
 				need(current_need);
 				draw_timer();
-				//draw_fish(current_side);
+				draw_fish(current_side);
 			}
-			//draw_timer(timer, current_need);
-			//sei();
+
 			scan_switches(0);
 
 			if (get_switch_press(_BV(SWE))) {
@@ -150,15 +145,8 @@ void fish_screen() {
 		timerOverflowCount++;
 
 		if (timerOverflowCount % 1 == 0) {
-			//timerOverflowCount = 0;
-			//message("ERROR");
 			timer--;
 			draw_timer();
-			//current_side += 1;
-			//if(current_side == 3) { current_side = 0; }		//loop the current side to the front of the fish
-		}
-		if (timerOverflowCount % 5 == 0) {
-			//draw_fish(current_side);
 		}
 	}
 	message("you killed me");
@@ -168,10 +156,10 @@ void fish_screen() {
 
 void draw_timer() {
 	rectangle rect;
-	rect.top = LCDWIDTH - 70;
-	rect.bottom = LCDWIDTH - 55;
-	rect.left = LCDHEIGHT/2 - 15;
-	rect.right = LCDHEIGHT/2 + 15;
+	rect.top = 60;
+	rect.bottom = 90;
+	rect.left = 250;
+	rect.right = 285;
 
 	if(current_need == HAPPY) {
 		display_color(WHITE,GREEN);
@@ -183,7 +171,7 @@ void draw_timer() {
 
 	char timer_string[6];
 	itoa(timer, timer_string, 10);		//converting int to string
-	display_string_xy(timer_string, LCDHEIGHT/2 - 10, LCDWIDTH - 65);
+	display_string_xy(timer_string, 260, 70);
 
 }
 
@@ -312,17 +300,19 @@ void unoutline_button(uint8_t button) {
 }
 
 void message(char message[]) {
+
+	display_color(LIME_GREEN, BLACK);
+	display_string_xy("Tuna says:", 224, 140);
+
 	display_color(BLACK, WHITE);
 
 	rectangle rect;
-	rect.top = 15;
-	rect.bottom = 40;
+	rect.top = 150;
+	rect.bottom = 170;
 	rect.left = 220;
 	rect.right = LCDHEIGHT;
 	fill_rectangle(rect, WHITE);
-	//display_string_xy("            ", 200, 15);
-	display_string_xy(message, 223, 23);
-	//display_string_xy("            ", 200, 31);
+	display_string_xy(message, 224, 155);
 
 }
 
