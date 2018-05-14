@@ -111,7 +111,7 @@ void fish_screen() {
 					dead = TRUE;
 				}
 				timer = 0;
-				current_need = rand() % 4;
+				current_need = (rand() % 4) + 1;
 				need(current_need);
 				draw_timer();
 				//draw_fish(current_side);
@@ -328,25 +328,17 @@ void message(char message[]) {
 
 void need(uint8_t need) {
 	if(need == FOOD) {
-		//timer += 3 + (rand() % 10);
 		current_need = FOOD;
 		message("I'M STARVING!!");
-		//draw_buttons();
 	} else if (need == HUG) {
-		//timer += 3 + (rand() % 10);
 		current_need = HUG;
 		message("do u even luv me");
-		//draw_buttons();
 	} else if (need == WALK) {
-		//timer += 3 + (rand() % 10);
 		current_need = WALK;
 		message("i look fat pig");
-		//draw_buttons();
 	} else if (need == WASH) {
-		//timer += 3 + (rand() % 10);
 		current_need = WASH;
 		message("my fins stanky");
-		//draw_buttons();
 	}
 	timer += 5 + (rand() % 10);
 	draw_buttons();
