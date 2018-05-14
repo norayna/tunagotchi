@@ -17,6 +17,9 @@
 #define RIGHT 2
 #define FRONT 0
 
+#define TRUE 1
+#define FALSE 0
+
 // drawing methods
 void intro_screen();
 void fish_screen();		// main screen
@@ -41,6 +44,7 @@ uint8_t current_side;
 uint16_t timer;
 uint8_t selected_button;
 uint32_t counter_seed;
+uint8_t dead;
 
 //uint16_t EEMEM seed_pointer;
 
@@ -79,11 +83,11 @@ void intro_screen() {
 void fish_screen() {
 	clear_screen();
 
-	need(rand() % 4);
+
 	timer = 10;
 	current_side = 0;
 	selected_button = FOOD;
-	//draw_buttons();
+	need(rand() % 4);
 	outline_selected_button();
 
 	//TODO remove
@@ -95,15 +99,18 @@ void fish_screen() {
 	srand(counter_seed);
 	uint8_t timerOverflowCount = 0;
 
+
 	for(;;) {
+		if(dead) break;
 		while ((TIFR0 & 0x01) == 0) {
+			if(dead) break;
 
 			if(timer == 0) {
-				//current_need = random_need();
+				if(current_need != HAPPY) {
+					dead = TRUE;
+				}
 				timer = 0;
 				current_need = rand() % 4;
-				//current_need++;
-				//if (current_need == 5) { current_need = 1;}
 				need(current_need);
 				draw_timer();
 				draw_fish(RIGHT);
@@ -147,6 +154,9 @@ void fish_screen() {
 			draw_timer();
 		}
 	}
+	message("you killed me");
+	timer = 666;
+	draw_timer();
 }
 
 void draw_timer() {
