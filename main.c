@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <avr/eeprom.h>
+#include <avr/io.h>
 
 #include "lcd.c"
 #include "ruota.c"
@@ -17,6 +18,7 @@
 #define FRONT 0
 
 // drawing methods
+void intro_screen();
 void fish_screen();		// main screen
 void draw_fish(uint8_t side);
 void draw_sad_fish(uint8_t side);
@@ -34,81 +36,135 @@ void need(uint8_t need);
 void action(uint8_t need);
 
 
-uint8_t current_need;
+uint16_t current_need;
 uint8_t current_side;
-uint8_t timer;
+uint16_t timer;
 uint8_t selected_button;
+uint32_t counter_seed;
+
+//uint16_t EEMEM seed_pointer;
+
+
 
 int main() {
+	counter_seed = 0;
+
 	init_lcd();
 	set_orientation(West);
 	os_init_ruota();
-	//intro_screen();
-	fish_screen();
+	intro_screen();
+	//fish_screen();
+}
+
+void intro_screen() {
+	display_color(LIGHT_GREEN, BLACK);
+	display_string("Welcome to TUNAGOTCHI. The neediest tamagotchi in the world!!\n");
+	display_string("This tuna is always 2 steps away from death.\n");
+  display_string("It also tends to be dramatic about everything.\n");
+	display_string("Tuna still loves you with its tiny fish heart, but has deep insecurities.\n");
+	display_string("\n");
+	display_string("Press OK if you love Tuna back.\n");
+
+	while(1) {
+		counter_seed++;
+		scan_switches(0);
+		if(get_switch_press(_BV(SWC))) {
+			fish_screen();
+		}
+	}
+
+
 }
 
 void fish_screen() {
-	need(WASH);
-	timer = 300000;
+	clear_screen();
+
+	need(rand() % 4);
+	timer = 10;
 	current_side = 0;
 	selected_button = FOOD;
-	draw_buttons();
+	//draw_buttons();
+	outline_selected_button();
 
 	//TODO remove
-	draw_happy_fish(0);
+	draw_happy_fish(RIGHT);
 
 	// copied from https://exploreembedded.com/wiki/AVR_Timer_programming
 	TCNT0=0x00;
-	TCCR0 = (1<<CS00) | (1<<CS02);
-
+	TCCR0B = (1<<CS00) | (1<<CS02);
+	srand(counter_seed);
+	uint8_t timerOverflowCount = 0;
 
 	for(;;) {
-		if(timer == 0) {
-			//current_need = random_need();
-			current_need++;
-			if (current_need == 5) { current_need = 1;}
+		while ((TIFR0 & 0x01) == 0) {
+
+			if(timer == 0) {
+				//current_need = random_need();
+				timer = 0;
+				current_need = rand() % 4;
+				//current_need++;
+				//if (current_need == 5) { current_need = 1;}
+				need(current_need);
+				draw_timer();
+			}
+			//draw_timer(timer, current_need);
+			//sei();
+			scan_switches(0);
+
+			if (get_switch_press(_BV(SWE))) {
+				outline_selected_button(BLACK);
+				selected_button++;
+				if(selected_button == 5) { selected_button = 1; }
+				outline_selected_button(YELLOW);
+			}
+
+			if (get_switch_press(_BV(SWW))) {
+				outline_selected_button(BLACK);
+				selected_button--;
+				if(selected_button == 0) { selected_button = 4; }
+				outline_selected_button(YELLOW);
+			}
+
+			if(get_switch_press(_BV(SWC))) {
+				action(selected_button);
+				draw_timer();
+			}
+
+
+			current_side += 1;
+			if(current_side == 3) { current_side = 0; }		//loop the current side to the front of the fish
 		}
-		//draw_timer(timer, current_need);
-		//sei();
-		scan_switches(0);
+		TCNT0 = 0x00;
+		TIFR0 = 0x01; //clear timer1 overflow flag
+		timerOverflowCount++;
 
-		if (get_switch_press(_BV(SWE))) {
-			outline_selected_button(BLACK);
-			selected_button++;
-			if(selected_button == 5) { selected_button = 1; }
-			outline_selected_button(YELLOW);
+		if (timerOverflowCount % 1 == 0) {
+			//timerOverflowCount = 0;
+			//message("ERROR");
+			timer--;
+			draw_timer();
 		}
-
-		if (get_switch_press(_BV(SWW))) {
-			outline_selected_button(BLACK);
-			selected_button--;
-			if(selected_button == 0) { selected_button = 4; }
-			outline_selected_button(YELLOW);
-		}
-
-		if(get_switch_press(_BV(SWC))) {
-			action(selected_button);
-		}
-
-
-		//sleep(1000); //java
-
-		timer -= 1;		// count down the timer
-		current_side += 1;
-		if(current_side == 3) { current_side = 0; }		//loop the current side to the front of the fish
 	}
 }
 
 void draw_timer() {
+	rectangle rect;
+	rect.top = LCDWIDTH - 70;
+	rect.bottom = LCDWIDTH - 55;
+	rect.left = LCDHEIGHT/2 - 15;
+	rect.right = LCDHEIGHT/2 + 15;
+
 	if(current_need == HAPPY) {
 		display_color(WHITE,GREEN);
+		fill_rectangle(rect, GREEN);
 	} else {
 		display_color(WHITE,RED);
+		fill_rectangle(rect, RED);
 	}
 
 	char timer_string[6];
 	itoa(timer, timer_string, 10);		//converting int to string
-	display_string_xy(timer_string, LCDHEIGHT/2 - 10, LCDWIDTH - 60);
+	display_string_xy(timer_string, LCDHEIGHT/2 - 10, LCDWIDTH - 65);
 
 }
 
@@ -154,7 +210,7 @@ void draw_buttons() {
 	display_string_xy("ME!!", (rect.left + 15), (rect.top + 23));
 
 	highlight_current_need();
-	outline_selected_button(YELLOW);
+	//outline_selected_button(YELLOW);
 }
 
 void highlight_current_need() {
@@ -255,18 +311,23 @@ void message(char message[]) {
 
 void need(uint8_t need) {
 	if(need == FOOD) {
+		timer += 5;
 		current_need = FOOD;
-		message("I'M STARVING!! I'M GONNA FAINT ;(");
+		message("I'M STARVING!!");
 	} else if (need == HUG) {
+		timer += 7;
 		current_need = HUG;
-		message("i'm sooo lonely and sad... love me!!");
+		message("do u even luv me");
 	} else if (need == WALK) {
+		timer += 8;
 		current_need = WALK;
-		message("i'm getting fat and bored in this aquarium");
+		message("i look fat pig");
 	} else if (need == WASH) {
+		timer += 10;
 		current_need = WASH;
 		message("my fins is stanky");
 	}
+	draw_buttons();
 }
 
 void action(uint8_t action) {
@@ -277,7 +338,7 @@ void action(uint8_t action) {
 			message("mmm chicken!");
 			timer += 3;
 		} else if (action == HUG) {
-			message("*cuddles* *bubbles*");
+			message("*cuddles**bubbles*");
 			timer += 3;
 		} else if (action == WALK) {
 			message("woof!");
@@ -304,323 +365,330 @@ void draw_happy_fish(uint8_t side) {
 	rect.top = top;
 	rect.left = left;
 
-	//line 1
+	if (side == RIGHT) {
 
-	//line 2
-	rect.top = top + 1*sq + 1;
-	rect.bottom = top + 2*sq;
-	rect.left = left + 7*sq + 1;
-	rect.right = left + 9*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 1
 
-	//line 3
-	rect.top = top + 2*sq + 1;
-	rect.bottom = top + 3*sq;
-	rect.left = left + 9*sq + 1;
-	rect.right = left + 11*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 2
+		rect.top = top + 1*sq + 1;
+		rect.bottom = top + 2*sq;
+		rect.left = left + 7*sq + 1;
+		rect.right = left + 9*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 4
-	rect.top = top + 3*sq + 1;
-	rect.bottom = top + 4*sq;
-	rect.left = left + 10*sq + 1;
-	rect.right = left + 12*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 17*sq + 1;
-	rect.right = left + 18*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 3
+		rect.top = top + 2*sq + 1;
+		rect.bottom = top + 3*sq;
+		rect.left = left + 9*sq + 1;
+		rect.right = left + 11*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 5
-	rect.top = top + 4*sq + 1;
-	rect.bottom = top + 5*sq;
-	rect.left = left + 11*sq + 1;
-	rect.right = left + 13*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 17*sq + 1;
-	rect.right = left + 20*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 4
+		rect.top = top + 3*sq + 1;
+		rect.bottom = top + 4*sq;
+		rect.left = left + 10*sq + 1;
+		rect.right = left + 12*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 17*sq + 1;
+		rect.right = left + 18*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 6
-	rect.top = top + 5*sq + 1;
-	rect.bottom = top + 6*sq;
-	rect.left = left + 12*sq + 1;
-	rect.right = left + 14*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 14*sq + 1;
-	rect.right = left + 21*sq;
-	fill_rectangle(rect, DARK_BLUE);
+		//line 5
+		rect.top = top + 4*sq + 1;
+		rect.bottom = top + 5*sq;
+		rect.left = left + 11*sq + 1;
+		rect.right = left + 13*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 17*sq + 1;
+		rect.right = left + 20*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 7
-	rect.top = top + 6*sq + 1;
-	rect.bottom = top + 7*sq;
-	rect.left = left + 0*sq + 1;
-	rect.right = left + 2*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 12*sq + 1;
-	rect.right = left + 13*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 13*sq + 1;
-	rect.right = left + 23*sq;
-	fill_rectangle(rect, DARK_BLUE);
+		//line 6
+		rect.top = top + 5*sq + 1;
+		rect.bottom = top + 6*sq;
+		rect.left = left + 12*sq + 1;
+		rect.right = left + 14*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 14*sq + 1;
+		rect.right = left + 21*sq;
+		fill_rectangle(rect, DARK_BLUE);
 
-	//line 8
-	rect.top = top + 7*sq + 1;
-	rect.bottom = top + 8*sq;
-	rect.left = left + 1*sq + 1;
-	rect.right = left + 3*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 11*sq + 1;
-	rect.right = left + 24*sq;
-	fill_rectangle(rect, DARK_BLUE);
+		//line 7
+		rect.top = top + 6*sq + 1;
+		rect.bottom = top + 7*sq;
+		rect.left = left + 0*sq + 1;
+		rect.right = left + 2*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 12*sq + 1;
+		rect.right = left + 13*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 13*sq + 1;
+		rect.right = left + 23*sq;
+		fill_rectangle(rect, DARK_BLUE);
 
-	//line 9
-	rect.top = top + 8*sq + 1;
-	rect.bottom = top + 9*sq;
-	rect.left = left + 1*sq + 1;
-	rect.right = left + 4*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 10*sq + 1;
-	rect.right = left + 13*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 13*sq + 1;
-	rect.right = left + 22*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 22*sq + 1;
-	rect.right = left + 26*sq;
-	fill_rectangle(rect, DARK_BLUE);
+		//line 8
+		rect.top = top + 7*sq + 1;
+		rect.bottom = top + 8*sq;
+		rect.left = left + 1*sq + 1;
+		rect.right = left + 3*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 11*sq + 1;
+		rect.right = left + 24*sq;
+		fill_rectangle(rect, DARK_BLUE);
 
-	//line 10
-	rect.top = top + 9*sq + 1;
-	rect.bottom = top + 10*sq;
-	rect.left = left + 2*sq + 1;
-	rect.right = left + 5*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 9*sq + 1;
-	rect.right = left + 11*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 11*sq + 1;
-	rect.right = left + 25*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 25*sq + 1;
-	rect.right = left + 27*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 9
+		rect.top = top + 8*sq + 1;
+		rect.bottom = top + 9*sq;
+		rect.left = left + 1*sq + 1;
+		rect.right = left + 4*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 10*sq + 1;
+		rect.right = left + 13*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 13*sq + 1;
+		rect.right = left + 22*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 22*sq + 1;
+		rect.right = left + 26*sq;
+		fill_rectangle(rect, DARK_BLUE);
 
-	//line 11
-	rect.top = top + 10*sq + 1;
-	rect.bottom = top + 11*sq;
-	rect.left = left + 3*sq + 1;
-	rect.right = left + 6*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 8*sq + 1;
-	rect.right = left + 10*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 10*sq + 1;
-	rect.right = left + 23*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 23*sq + 1;
-	rect.right = left + 25*sq;
-	fill_rectangle(rect, OLIVE);
-	rect.left = left + 25*sq + 1;
-	rect.right = left + 26*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 26*sq + 1;
-	rect.right = left + 27*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 10
+		rect.top = top + 9*sq + 1;
+		rect.bottom = top + 10*sq;
+		rect.left = left + 2*sq + 1;
+		rect.right = left + 5*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 9*sq + 1;
+		rect.right = left + 11*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 11*sq + 1;
+		rect.right = left + 25*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 25*sq + 1;
+		rect.right = left + 27*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 12
-	rect.top = top + 11*sq + 1;
-	rect.bottom = top + 12*sq;
-	rect.left = left + 3*sq + 1;
-	rect.right = left + 6*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 7*sq + 1;
-	rect.right = left + 8*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 8*sq + 1;
-	rect.right = left + 11*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 11*sq + 1;
-	rect.right = left + 22*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 22*sq + 1;
-	rect.right = left + 23*sq;
-	fill_rectangle(rect, OLIVE);
-	rect.left = left + 23*sq + 1;
-	rect.right = left + 25*sq;
-	fill_rectangle(rect, BLACK);
-	rect.left = left + 25*sq + 1;
-	rect.right = left + 26*sq;
-	fill_rectangle(rect, OLIVE);
-	rect.left = left + 26*sq + 1;
-	rect.right = left + 27*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 27*sq + 1;
-	rect.right = left + 28*sq;
-	fill_rectangle(rect, DARK_BLUE);
+		//line 11
+		rect.top = top + 10*sq + 1;
+		rect.bottom = top + 11*sq;
+		rect.left = left + 3*sq + 1;
+		rect.right = left + 6*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 8*sq + 1;
+		rect.right = left + 10*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 10*sq + 1;
+		rect.right = left + 23*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 23*sq + 1;
+		rect.right = left + 25*sq;
+		fill_rectangle(rect, OLIVE);
+		rect.left = left + 25*sq + 1;
+		rect.right = left + 26*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 26*sq + 1;
+		rect.right = left + 27*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 13
-	rect.top = top + 12*sq + 1;
-	rect.bottom = top + 13*sq;
-	rect.left = left + 4*sq + 1;
-	rect.right = left + 7*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 7*sq + 1;
-	rect.right = left + 9*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 9*sq + 1;
-	rect.right = left + 22*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 22*sq + 1;
-	rect.right = left + 23*sq;
-	fill_rectangle(rect, OLIVE);
-	rect.left = left + 23*sq + 1;
-	rect.right = left + 25*sq;
-	fill_rectangle(rect, BLACK);
-	rect.left = left + 25*sq + 1;
-	rect.right = left + 26*sq;
-	fill_rectangle(rect, OLIVE);
-	rect.left = left + 26*sq + 1;
-	rect.right = left + 28*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 12
+		rect.top = top + 11*sq + 1;
+		rect.bottom = top + 12*sq;
+		rect.left = left + 3*sq + 1;
+		rect.right = left + 6*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 7*sq + 1;
+		rect.right = left + 8*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 8*sq + 1;
+		rect.right = left + 11*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 11*sq + 1;
+		rect.right = left + 22*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 22*sq + 1;
+		rect.right = left + 23*sq;
+		fill_rectangle(rect, OLIVE);
+		rect.left = left + 23*sq + 1;
+		rect.right = left + 25*sq;
+		fill_rectangle(rect, BLACK);
+		rect.left = left + 25*sq + 1;
+		rect.right = left + 26*sq;
+		fill_rectangle(rect, OLIVE);
+		rect.left = left + 26*sq + 1;
+		rect.right = left + 27*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 27*sq + 1;
+		rect.right = left + 28*sq;
+		fill_rectangle(rect, DARK_BLUE);
 
-	//line 14
-	rect.top = top + 13*sq + 1;
-	rect.bottom = top + 14*sq;
-	rect.left = left + 4*sq + 1;
-	rect.right = left + 7*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 7*sq + 1;
-	rect.right = left + 28*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 13
+		rect.top = top + 12*sq + 1;
+		rect.bottom = top + 13*sq;
+		rect.left = left + 4*sq + 1;
+		rect.right = left + 7*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 7*sq + 1;
+		rect.right = left + 9*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 9*sq + 1;
+		rect.right = left + 22*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 22*sq + 1;
+		rect.right = left + 23*sq;
+		fill_rectangle(rect, OLIVE);
+		rect.left = left + 23*sq + 1;
+		rect.right = left + 25*sq;
+		fill_rectangle(rect, BLACK);
+		rect.left = left + 25*sq + 1;
+		rect.right = left + 26*sq;
+		fill_rectangle(rect, OLIVE);
+		rect.left = left + 26*sq + 1;
+		rect.right = left + 28*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 15
-	rect.top = top + 14*sq + 1;
-	rect.bottom = top + 15*sq;
-	rect.left = left + 3*sq + 1;
-	rect.right = left + 6*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 7*sq + 1;
-	rect.right = left + 16*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 16*sq + 1;
-	rect.right = left + 20*sq;
-	fill_rectangle(rect, GREY);
-	rect.left = left + 20*sq + 1;
-	rect.right = left + 25*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 25*sq + 1;
-	rect.right = left + 26*sq;
-	fill_rectangle(rect, RED);
-	rect.left = left + 26*sq + 1;
-	rect.right = left + 28*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 14
+		rect.top = top + 13*sq + 1;
+		rect.bottom = top + 14*sq;
+		rect.left = left + 4*sq + 1;
+		rect.right = left + 7*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 7*sq + 1;
+		rect.right = left + 28*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 16
-	rect.top = top + 15*sq + 1;
-	rect.bottom = top + 16*sq;
-	rect.left = left + 3*sq + 1;
-	rect.right = left + 6*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 8*sq + 1;
-	rect.right = left + 12*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 12*sq + 1;
-	rect.right = left + 19*sq;
-	fill_rectangle(rect, GREY);
-	rect.left = left + 19*sq + 1;
-	rect.right = left + 26*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 26*sq + 1;
-	rect.right = left + 28*sq;
-	fill_rectangle(rect, RED);
+		//line 15
+		rect.top = top + 14*sq + 1;
+		rect.bottom = top + 15*sq;
+		rect.left = left + 3*sq + 1;
+		rect.right = left + 6*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 7*sq + 1;
+		rect.right = left + 16*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 16*sq + 1;
+		rect.right = left + 20*sq;
+		fill_rectangle(rect, GREY);
+		rect.left = left + 20*sq + 1;
+		rect.right = left + 25*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 25*sq + 1;
+		rect.right = left + 26*sq;
+		fill_rectangle(rect, RED);
+		rect.left = left + 26*sq + 1;
+		rect.right = left + 28*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 17
-	rect.top = top + 16*sq + 1;
-	rect.bottom = top + 17*sq;
-	rect.left = left + 2*sq + 1;
-	rect.right = left + 5*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 9*sq + 1;
-	rect.right = left + 27*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 16
+		rect.top = top + 15*sq + 1;
+		rect.bottom = top + 16*sq;
+		rect.left = left + 3*sq + 1;
+		rect.right = left + 6*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 8*sq + 1;
+		rect.right = left + 12*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 12*sq + 1;
+		rect.right = left + 19*sq;
+		fill_rectangle(rect, GREY);
+		rect.left = left + 19*sq + 1;
+		rect.right = left + 26*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 26*sq + 1;
+		rect.right = left + 28*sq;
+		fill_rectangle(rect, RED);
 
-	//line 18
-	rect.top = top + 17*sq + 1;
-	rect.bottom = top + 18*sq;
-	rect.left = left + 1*sq + 1;
-	rect.right = left + 4*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 10*sq + 1;
-	rect.right = left + 25*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 17
+		rect.top = top + 16*sq + 1;
+		rect.bottom = top + 17*sq;
+		rect.left = left + 2*sq + 1;
+		rect.right = left + 5*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 9*sq + 1;
+		rect.right = left + 27*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 19
-	rect.top = top + 18*sq + 1;
-	rect.bottom = top + 19*sq;
-	rect.left = left + 1*sq + 1;
-	rect.right = left + 3*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 10*sq + 1;
-	rect.right = left + 11*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 11*sq + 1;
-	rect.right = left + 24*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 18
+		rect.top = top + 17*sq + 1;
+		rect.bottom = top + 18*sq;
+		rect.left = left + 1*sq + 1;
+		rect.right = left + 4*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 10*sq + 1;
+		rect.right = left + 25*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 20
-	rect.top = top + 19*sq + 1;
-	rect.bottom = top + 20*sq;
-	rect.left = left + 0*sq + 1;
-	rect.right = left + 2*sq;
-	fill_rectangle(rect, DARK_BLUE);
-	rect.left = left + 10*sq + 1;
-	rect.right = left + 13*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 13*sq + 1;
-	rect.right = left + 23*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
+		//line 19
+		rect.top = top + 18*sq + 1;
+		rect.bottom = top + 19*sq;
+		rect.left = left + 1*sq + 1;
+		rect.right = left + 3*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 10*sq + 1;
+		rect.right = left + 11*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 11*sq + 1;
+		rect.right = left + 24*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 21
-	rect.top = top + 20*sq + 1;
-	rect.bottom = top + 21*sq;
-	rect.left = left + 9*sq + 1;
-	rect.right = left + 12*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 15*sq + 1;
-	rect.right = left + 21*sq;
-	fill_rectangle(rect, LIGHT_BLUE);
-	rect.left = left + 15*sq + 1;
-	rect.right = left + 16*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 20
+		rect.top = top + 19*sq + 1;
+		rect.bottom = top + 20*sq;
+		rect.left = left + 0*sq + 1;
+		rect.right = left + 2*sq;
+		fill_rectangle(rect, DARK_BLUE);
+		rect.left = left + 10*sq + 1;
+		rect.right = left + 13*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 13*sq + 1;
+		rect.right = left + 23*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
 
-	//line 22
-	rect.top = top + 21*sq + 1;
-	rect.bottom = top + 22*sq;
-	rect.left = left + 9*sq + 1;
-	rect.right = left + 11*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 20*sq + 1;
-	rect.right = left + 22*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 21
+		rect.top = top + 20*sq + 1;
+		rect.bottom = top + 21*sq;
+		rect.left = left + 9*sq + 1;
+		rect.right = left + 12*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 15*sq + 1;
+		rect.right = left + 21*sq;
+		fill_rectangle(rect, LIGHT_BLUE);
+		rect.left = left + 15*sq + 1;
+		rect.right = left + 16*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 23
-	rect.top = top + 22*sq + 1;
-	rect.bottom = top + 23*sq;
-	rect.left = left + 7*sq + 1;
-	rect.right = left + 10*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 20*sq + 1;
-	rect.right = left + 21*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 22
+		rect.top = top + 21*sq + 1;
+		rect.bottom = top + 22*sq;
+		rect.left = left + 9*sq + 1;
+		rect.right = left + 11*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 20*sq + 1;
+		rect.right = left + 22*sq;
+		fill_rectangle(rect, YELLOW);
 
-	//line 24
-	rect.top = top + 23*sq + 1;
-	rect.bottom = top + 24*sq;
-	rect.left = left + 6*sq + 1;
-	rect.right = left + 8*sq;
-	fill_rectangle(rect, YELLOW);
-	rect.left = left + 19*sq + 1;
-	rect.right = left + 20*sq;
-	fill_rectangle(rect, YELLOW);
+		//line 23
+		rect.top = top + 22*sq + 1;
+		rect.bottom = top + 23*sq;
+		rect.left = left + 7*sq + 1;
+		rect.right = left + 10*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 20*sq + 1;
+		rect.right = left + 21*sq;
+		fill_rectangle(rect, YELLOW);
 
+		//line 24
+		rect.top = top + 23*sq + 1;
+		rect.bottom = top + 24*sq;
+		rect.left = left + 6*sq + 1;
+		rect.right = left + 8*sq;
+		fill_rectangle(rect, YELLOW);
+		rect.left = left + 19*sq + 1;
+		rect.right = left + 20*sq;
+		fill_rectangle(rect, YELLOW);
+
+	} else if (side == FRONT) {
+		//TODO
+	} else if (side == LEFT) {
+		//TODO
+	}
 }
