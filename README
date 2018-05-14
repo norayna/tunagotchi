@@ -1,0 +1,20 @@
+TUNAGOTCHI
+Computer Systems 2 Project by Rayna Bozhkova - 14 May 2018.
+
+This is a frantic tamagotchi game. Tuna is a fragile tuna and it needs attention and love in order to stay alive.
+
+I load it on Linux by using the following commands:
+
+avr-gcc -mmcu=at90usb1286 -DF_CPU=8000000 -Wall -Wextra -pedantic -fno-strict-aliasing -Wno-main -Wstrict-overflow=5 -fstrict-overflow -Winline -Os main.c -o main.elf
+avr-objcopy -O ihex main.elf main.hex
+
+Then clicking the reset button, then:
+
+sudo dfu-programmer at90usb1286 erase
+sudo dfu-programmer at90usb1286 flash main.hex
+sudo dfu-programmer at90usb1286 start
+
+I've been told Klaus's universal makefile also works and it is included in this, however it does not work on my machine.
+I also have copies of all the header files in the same directory as the main.c file. Your machine might not need this.
+
+Have fun and don't kill your Tuna!!
