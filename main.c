@@ -331,17 +331,17 @@ void need(uint8_t need) {
 		//timer += 3 + (rand() % 10);
 		current_need = FOOD;
 		message("I'M STARVING!!");
-		draw_buttons();
+		//draw_buttons();
 	} else if (need == HUG) {
 		//timer += 3 + (rand() % 10);
 		current_need = HUG;
 		message("do u even luv me");
-		draw_buttons();
+		//draw_buttons();
 	} else if (need == WALK) {
 		//timer += 3 + (rand() % 10);
 		current_need = WALK;
 		message("i look fat pig");
-		draw_buttons();
+		//draw_buttons();
 	} else if (need == WASH) {
 		//timer += 3 + (rand() % 10);
 		current_need = WASH;
